@@ -21,7 +21,7 @@
     "@heroicons/react": "^2.0.18",
     "react-hook-form": "^7.45.4",
     "zod": "^3.22.2",
-    "@hookform/resolvers": "^3.3.1",
+    "@hookform/resolvers": "^5.0.1",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "socket.io-client": "^4.7.2",

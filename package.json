@@ -1,0 +1,46 @@
+{
+  "name": "constructure",
+  "version": "1.0.0",
+  "description": "Визуальный конструктор образовательных курсов",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:migrate": "cd apps/api && npx prisma migrate dev",
+    "db:generate": "cd apps/api && npx prisma generate",
+    "db:seed": "cd apps/api && npx prisma db seed",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up -d",
+    "setup": "npm install && npm run db:generate && npm run db:migrate"
+  },
+  "devDependencies": {
+    "@turbo/gen": "^1.10.12",
+    "turbo": "^1.10.12",
+    "@types/node": "^20.5.2",
+    "typescript": "^5.1.6",
+    "prettier": "^3.0.0",
+    "eslint": "^8.47.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "author": "Constructure Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/f1b0nacc1-afk/constructure.git"
+  },
+  "bugs": {
+    "url": "https://github.com/f1b0nacc1-afk/constructure/issues"
+  },
+  "homepage": "https://github.com/f1b0nacc1-afk/constructure#readme"
+} 

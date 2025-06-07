@@ -1,0 +1,216 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Пользователи
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  firstName String?
+  lastName  String?
+  avatar    String?
+  
+  // Аутентификация
+  password  String
+  verified  Boolean  @default(false)
+  
+  // Метаданные
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  courses       Course[]
+  collaborations CourseCollaborator[]
+  comments      Comment[]
+  
+  @@map("users")
+}
+
+// Курсы
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  thumbnail   String?
+  
+  // Настройки
+  isPublic    Boolean  @default(false)
+  isTemplate  Boolean  @default(false)
+  
+  // Метаданные
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Связи
+  authorId      String
+  author        User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  nodes         CourseNode[]
+  edges         CourseEdge[]
+  collaborators CourseCollaborator[]
+  comments      Comment[]
+  versions      CourseVersion[]
+  
+  @@map("courses")
+}
+
+// Узлы курса (блоки)
+model CourseNode {
+  id       String @id @default(cuid())
+  courseId String
+  
+  // Основные свойства
+  type     NodeType
+  title    String
+  content  Json?
+  
+  // Позиционирование для разных режимов
+  positions Json // { tree: {x, y}, lego: {x, y}, mindmap: {x, y}, flowchart: {x, y} }
+  
+  // Настройки
+  config   Json? // Специфичные настройки для типа узла
+  
+  // Метаданные
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sourceEdges CourseEdge[] @relation("SourceNode")
+  targetEdges CourseEdge[] @relation("TargetNode")
+  
+  @@map("course_nodes")
+}
+
+// Связи между узлами
+model CourseEdge {
+  id       String @id @default(cuid())
+  courseId String
+  
+  // Узлы
+  sourceId String
+  targetId String
+  
+  // Свойства связи
+  type      EdgeType @default(SEQUENCE)
+  label     String?
+  condition Json?    // Условия для условных переходов
+  
+  // Стилизация
+  style Json? // Цвет, толщина линии и т.д.
+  
+  // Метаданные
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sourceNode CourseNode @relation("SourceNode", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetNode CourseNode @relation("TargetNode", fields: [targetId], references: [id], onDelete: Cascade)
+  
+  @@unique([sourceId, targetId])
+  @@map("course_edges")
+}
+
+// Совместная работа
+model CourseCollaborator {
+  id       String @id @default(cuid())
+  courseId String
+  userId   String
+  
+  // Права доступа
+  role        CollaboratorRole @default(VIEWER)
+  permissions Json?            // Детальные разрешения
+  
+  // Метаданные
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, userId])
+  @@map("course_collaborators")
+}
+
+// Комментарии
+model Comment {
+  id       String @id @default(cuid())
+  courseId String
+  userId   String
+  
+  // Контент
+  content   String
+  resolved  Boolean @default(false)
+  
+  // Позиция (для привязки к элементам)
+  nodeId    String?
+  position  Json?   // {x, y} координаты
+  
+  // Метаданные
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("comments")
+}
+
+// Версии курсов
+model CourseVersion {
+  id       String @id @default(cuid())
+  courseId String
+  
+  // Версия
+  version     String
+  description String?
+  
+  // Снапшот данных
+  snapshot Json // Полный снапшот курса на момент версии
+  
+  // Метаданные
+  createdAt DateTime @default(now())
+  
+  // Связи
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, version])
+  @@map("course_versions")
+}
+
+// Перечисления
+enum NodeType {
+  LESSON      // Урок
+  TEST        // Тест/Квиз
+  ASSIGNMENT  // Задание
+  VIDEO       // Видео
+  DOCUMENT    // Документ
+  INTERACTIVE // Интерактивный элемент
+  CONDITION   // Условный блок
+  START       // Начальный блок
+  END         // Конечный блок
+}
+
+enum EdgeType {
+  SEQUENCE    // Последовательная связь
+  CONDITION   // Условная связь
+  REFERENCE   // Ссылка/референс
+}
+
+enum CollaboratorRole {
+  OWNER       // Владелец
+  EDITOR      // Редактор
+  COMMENTER   // Комментатор
+  VIEWER      // Просмотрщик
+} 

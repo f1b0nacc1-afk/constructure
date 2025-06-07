@@ -5,44 +5,68 @@ import multipart from '@fastify/multipart'
 import websocket from '@fastify/websocket'
 import { config } from './config'
 import { logger } from './utils/logger'
+import authRoutes from './routes/auth'
 
 const fastify = Fastify({
   logger: {
     level: config.LOG_LEVEL,
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true
+      }
+    }
   },
 })
 
+// Регистрируем плагины
+async function registerPlugins() {
+  // CORS
+  await fastify.register(cors, {
+    origin: config.FRONTEND_URL,
+    credentials: true
+  })
+
+  // WebSocket поддержка
+  await fastify.register(websocket)
+
+  // Маршруты аутентификации
+  await fastify.register(authRoutes, { prefix: '/api/auth' })
+}
+
+// Базовый маршрут для проверки здоровья
+fastify.get('/health', async (request, reply) => {
+  return { status: 'ok', timestamp: new Date().toISOString() }
+})
+
+// Запуск сервера
 async function start() {
   try {
-    // Регистрируем плагины
-    await fastify.register(cors, {
-      origin: config.CORS_ORIGIN,
-      credentials: true,
+    await registerPlugins()
+    
+    await fastify.listen({
+      port: config.PORT,
+      host: config.HOST
     })
-
-    await fastify.register(jwt, {
-      secret: config.JWT_SECRET,
-    })
-
-    await fastify.register(multipart)
-    await fastify.register(websocket)
-
-    // Базовый роут для проверки здоровья
-    fastify.get('/health', async () => {
-      return { status: 'ok', timestamp: new Date().toISOString() }
-    })
-
-    // Запускаем сервер
-    await fastify.listen({ 
-      port: config.PORT, 
-      host: config.HOST 
-    })
-
+    
     logger.info(`🚀 Server running on http://${config.HOST}:${config.PORT}`)
-  } catch (err) {
-    logger.error('❌ Error starting server:', err)
+  } catch (error) {
+    logger.error('Error starting server:', error)
     process.exit(1)
   }
 }
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  logger.info('Received SIGINT, shutting down gracefully...')
+  await fastify.close()
+  process.exit(0)
+})
+
+process.on('SIGTERM', async () => {
+  logger.info('Received SIGTERM, shutting down gracefully...')
+  await fastify.close()
+  process.exit(0)
+})
 
 start() 

@@ -1,6 +1,8 @@
 {
   "name": "@constructure/api",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Constructure API Server",
+  "main": "dist/index.js",
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -11,29 +13,31 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx src/scripts/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push"
   },
   "dependencies": {
     "fastify": "^4.24.3",
     "@fastify/cors": "^8.4.0",
     "@fastify/jwt": "^7.2.4",
-    "@fastify/multipart": "^8.0.0",
     "@fastify/websocket": "^8.3.1",
     "@prisma/client": "^5.6.0",
     "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
     "socket.io": "^4.7.4",
     "zod": "^3.22.4",
     "winston": "^3.11.0",
     "dotenv": "^16.3.1",
     "cloudinary": "^1.41.0",
-    "redis": "^4.6.10"
+    "redis": "^4.6.10",
+    "prisma": "^5.6.0"
   },
   "devDependencies": {
-    "@types/node": "^20.8.0",
+    "@types/node": "^20.9.0",
     "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.5",
     "typescript": "^5.2.2",
-    "tsx": "^4.1.0",
-    "prisma": "^5.6.0",
+    "tsx": "^4.1.4",
     "eslint": "^8.51.0",
     "@typescript-eslint/eslint-plugin": "^6.9.0",
     "@typescript-eslint/parser": "^6.9.0"

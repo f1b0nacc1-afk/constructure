@@ -4,24 +4,35 @@
   "description": "Визуальный конструктор образовательных курсов",
   "private": true,
   "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:web": "cd apps/web && npm run dev",
     "dev:api": "cd apps/api && npm run dev",
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
-    "build:web": "cd apps/web && npm run build",
+    "dev:start": "./scripts/dev-start.sh",
+    "dev:setup": "npm run install:all && npm run build:types",
+    "install:all": "npm install --no-bin-links --ignore-scripts && cd apps/web && npm install --no-bin-links --ignore-scripts && cd ../api && npm install --no-bin-links --ignore-scripts && cd ../../packages/types && npm install --no-bin-links --ignore-scripts",
+    "build": "npm run build:types && npm run build:api && npm run build:web",
+    "build:types": "cd packages/types && npm run build",
     "build:api": "cd apps/api && npm run build",
-    "build": "npm run build:api && npm run build:web",
-    "install:web": "cd apps/web && npm install",
-    "install:api": "cd apps/api && npm install",
-    "install:all": "npm run install:web && npm run install:api",
+    "build:web": "cd apps/web && npm run build",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
-    "docker:prod": "docker-compose -f docker-compose.prod.yml up -d"
+    "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
+    "docker:dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
+    "prisma:generate": "cd apps/api && npx prisma generate",
+    "prisma:push": "cd apps/api && npx prisma db push",
+    "prisma:studio": "cd apps/api && npx prisma studio",
+    "lint": "npm run lint:web && npm run lint:api",
+    "lint:web": "cd apps/web && npm run lint",
+    "lint:api": "cd apps/api && npm run lint",
+    "type-check": "npm run type-check:web && npm run type-check:api",
+    "type-check:web": "cd apps/web && npm run type-check",
+    "type-check:api": "cd apps/api && npm run type-check"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",
-    "typescript": "^5.2.2",
-    "prettier": "^3.0.0",
+    "concurrently": "^8.2.2",
     "eslint": "^8.51.0",
-    "concurrently": "^8.2.2"
+    "prettier": "^3.0.0",
+    "typescript": "^5.2.2"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -37,4 +48,4 @@
     "url": "https://github.com/f1b0nacc1-afk/constructure/issues"
   },
   "homepage": "https://github.com/f1b0nacc1-afk/constructure#readme"
-} 
+}

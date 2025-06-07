@@ -1,0 +1,26 @@
+FROM node:18-alpine
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем package.json файлы
+COPY package*.json ./
+COPY apps/web/package*.json ./apps/web/
+COPY packages/types/package*.json ./packages/types/
+
+# Устанавливаем зависимости
+RUN npm install --no-bin-links --ignore-scripts
+RUN cd apps/web && npm install --no-bin-links --ignore-scripts
+RUN cd packages/types && npm install --no-bin-links --ignore-scripts
+
+# Копируем исходный код
+COPY . .
+
+# Собираем types пакет
+RUN cd packages/types && npm run build
+
+# Экспонируем порт
+EXPOSE 3000
+
+# Команда запуска для разработки
+CMD ["npm", "run", "dev:web"] 

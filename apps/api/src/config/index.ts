@@ -7,8 +7,8 @@ export const config = {
   PORT: parseInt(process.env.PORT || '3001', 10),
   HOST: process.env.HOST || '0.0.0.0',
   
-  // База данных
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/constructure',
+  // База данных - обновлен порт на 5433
+  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://constructure:dev_password_123@localhost:5433/constructure_dev',
   
   // Redis
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',

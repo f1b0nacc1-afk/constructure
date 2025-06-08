@@ -1,11 +1,11 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
-import multipart from '@fastify/multipart'
 import websocket from '@fastify/websocket'
 import { config } from './config'
 import { logger } from './utils/logger'
 import authRoutes from './routes/auth'
+import coursesRoutes from './routes/courses'
 
 const fastify = Fastify({
   logger: {
@@ -27,11 +27,19 @@ async function registerPlugins() {
     credentials: true
   })
 
+  // JWT плагин
+  await fastify.register(jwt, {
+    secret: config.JWT_SECRET!
+  })
+
   // WebSocket поддержка
   await fastify.register(websocket)
 
   // Маршруты аутентификации
   await fastify.register(authRoutes, { prefix: '/api/auth' })
+  
+  // Маршруты курсов
+  await fastify.register(coursesRoutes, { prefix: '/api/courses' })
 }
 
 // Базовый маршрут для проверки здоровья

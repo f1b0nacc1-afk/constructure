@@ -1,0 +1,57 @@
+# Используем Node.js 18 Alpine для меньшего размера
+FROM node:18-alpine
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Устанавливаем системные зависимости включая OpenSSL для Prisma
+RUN apk add --no-cache \
+    tini \
+    dumb-init \
+    curl \
+    bash \
+    openssl \
+    openssl-dev \
+    libc6-compat
+
+# Создаем пользователя node с правильными правами
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
+
+# Копируем package files для установки зависимостей
+COPY --chown=nextjs:nodejs package*.json ./
+COPY --chown=nextjs:nodejs apps/api/package*.json ./apps/api/
+COPY --chown=nextjs:nodejs packages/types/package*.json ./packages/types/
+
+# Устанавливаем все зависимости для development
+RUN npm ci
+
+# Копируем исходный код
+COPY --chown=nextjs:nodejs apps/api ./apps/api
+COPY --chown=nextjs:nodejs packages/types ./packages/types
+
+# Переключаемся на пользователя nextjs
+USER nextjs
+
+# Переходим в API директорию
+WORKDIR /app/apps/api
+
+# Устанавливаем зависимости в API директории
+RUN npm ci
+
+# Генерируем Prisma клиент
+RUN npx prisma generate
+
+# Создаем директорию для логов
+USER root
+RUN mkdir -p /app/logs && chown -R nextjs:nodejs /app/logs
+USER nextjs
+
+# Экспонируем порт
+EXPOSE 3001
+
+# Используем tini как init процесс для правильной обработки сигналов
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Запускаем приложение
+CMD ["npm", "run", "dev"] 

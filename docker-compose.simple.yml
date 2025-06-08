@@ -1,0 +1,163 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: constructure-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: constructure
+      POSTGRES_PASSWORD: dev_password_123
+      POSTGRES_DB: constructure_dev
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./logs/postgres:/var/log/postgresql
+    networks:
+      - constructure-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U constructure -d constructure_dev"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis для кэширования
+  redis:
+    image: redis:7-alpine
+    container_name: constructure-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./logs/redis:/var/log/redis
+    networks:
+      - constructure-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # API сервер
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: constructure-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: "postgresql://constructure:dev_password_123@postgres:5432/constructure_dev"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
+      PORT: 3001
+      HOST: "0.0.0.0"
+      LOG_LEVEL: debug
+      LOG_FILE: /app/logs/api.log
+      CORS_ORIGIN: "http://localhost:3000"
+      FRONTEND_URL: "http://localhost:3000"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./logs/api:/app/logs
+    networks:
+      - constructure-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Веб-приложение
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: constructure-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      API_URL: http://api:3001
+      LOG_LEVEL: debug
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./logs/web:/app/logs
+    networks:
+      - constructure-network
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Adminer для управления БД
+  adminer:
+    image: adminer:latest
+    container_name: constructure-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha
+    networks:
+      - constructure-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  constructure-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16 

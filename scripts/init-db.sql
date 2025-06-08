@@ -27,4 +27,11 @@ ALTER DATABASE constructure_dev SET timezone TO 'UTC';
 ALTER DATABASE constructure_dev SET log_statement TO 'all';
 
 -- Комментарий
-COMMENT ON DATABASE constructure_dev IS 'База данных для разработки платформы Constructure'; 
+COMMENT ON DATABASE constructure_dev IS 'База данных для разработки платформы Constructure';
+
+-- Создание базы данных если не существует
+SELECT 'CREATE DATABASE constructure_dev'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'constructure_dev');
+
+-- Установка кодировки по умолчанию
+ALTER DATABASE constructure_dev SET timezone TO 'UTC'; 

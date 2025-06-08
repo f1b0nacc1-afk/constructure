@@ -289,7 +289,7 @@ export default function CoursePage() {
 
             {/* Действия */}
             <div className="flex items-center space-x-2 ml-4">
-              <Link href={`/courses/${course.id}/editor`}>
+              <Link href={`/courses/${course.id}/edit`}>
                 <Button>
                   <EditIcon className="w-4 h-4 mr-2" />
                   Редактировать
@@ -345,7 +345,7 @@ export default function CoursePage() {
                 <div className="text-center py-8">
                   <BookOpenIcon className="mx-auto w-12 h-12 text-gray-400 mb-4" />
                   <p className="text-gray-600 mb-4">Курс пока не содержит блоков</p>
-                  <Link href={`/courses/${course.id}/editor`}>
+                  <Link href={`/courses/${course.id}/edit`}>
                     <Button>
                       <EditIcon className="w-4 h-4 mr-2" />
                       Начать редактирование

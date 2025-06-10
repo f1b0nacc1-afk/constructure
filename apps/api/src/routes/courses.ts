@@ -943,4 +943,83 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
       return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
     }
   });
+
+  // PUT /api/courses/:id/nodes/positions - Массовое обновление позиций узлов
+  const massUpdatePositionsSchema = z.object({
+    positions: z.array(z.object({
+      nodeId: z.string(),
+      positions: z.object({
+        tree: z.object({ x: z.number(), y: z.number() }).optional(),
+        lego: z.object({ x: z.number(), y: z.number() }).optional(),
+        mindmap: z.object({ x: z.number(), y: z.number() }).optional(),
+        flowchart: z.object({ x: z.number(), y: z.number() }).optional()
+      })
+    }))
+  });
+
+  fastify.put<{ 
+    Params: z.infer<typeof courseParamsSchema>,
+    Body: z.infer<typeof massUpdatePositionsSchema>
+  }>('/:id/nodes/positions', async (request, reply) => {
+    try {
+      const { id } = courseParamsSchema.parse(request.params);
+      const { positions } = massUpdatePositionsSchema.parse(request.body);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      // Массовое обновление позиций в транзакции для производительности
+      await prisma.$transaction(async (tx) => {
+        for (const positionUpdate of positions) {
+          // Получаем текущие позиции узла
+          const currentNode = await tx.courseNode.findFirst({
+            where: { 
+              id: positionUpdate.nodeId, 
+              courseId: id 
+            },
+            select: { positions: true }
+          });
+
+          if (currentNode) {
+            // Объединяем текущие позиции с новыми
+            const mergedPositions = {
+              ...(currentNode.positions as any),
+              ...positionUpdate.positions
+            };
+
+            // Обновляем узел
+            await tx.courseNode.update({
+              where: { id: positionUpdate.nodeId },
+              data: { positions: mergedPositions }
+            });
+          }
+        }
+      });
+
+      return reply.send({ 
+        success: true, 
+        message: `Обновлено позиций для ${positions.length} узлов` 
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
 } 

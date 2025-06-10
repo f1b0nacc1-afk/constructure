@@ -24,8 +24,8 @@ function getOptionalEnvVar(name: string, defaultValue?: string): string | undefi
 
 // Конфигурация приложения
 export const env = {
-  // API
-  API_URL: getOptionalEnvVar('NEXT_PUBLIC_API_URL', 'http://localhost:3001'),
+  // API - используем относительные пути если переменная пуста
+  API_URL: getOptionalEnvVar('NEXT_PUBLIC_API_URL') || '',
   
   // Режим разработки
   isDevelopment: process.env.NODE_ENV === 'development',

@@ -8,15 +8,7 @@ import authRoutes from './routes/auth'
 import coursesRoutes from './routes/courses'
 
 const fastify = Fastify({
-  logger: {
-    level: config.LOG_LEVEL,
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true
-      }
-    }
-  },
+  logger: true
 })
 
 // Регистрируем плагины

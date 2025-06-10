@@ -14,14 +14,16 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  username  String   @unique
+  username  String?  @unique
   firstName String?
   lastName  String?
   avatar    String?
   
   // Аутентификация
-  password  String
-  verified  Boolean  @default(false)
+  password     String
+  verified     Boolean  @default(false)
+  refreshToken String?
+  lastLoginAt  DateTime?
   
   // Метаданные
   createdAt DateTime @default(now())

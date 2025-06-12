@@ -99,6 +99,39 @@ services:
         max-size: "20m"
         max-file: "5"
 
+  # Next.js Web приложение
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: constructure-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: "http://localhost:8000/api"
+      PORT: 3000
+      HOST: "0.0.0.0"
+    ports:
+      - "3000:3000"
+    volumes:
+      - web_node_modules:/app/apps/web/node_modules
+      - web_next:/app/apps/web/.next
+    networks:
+      - constructure-network
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
   # Adminer для управления БД
   adminer:
     image: adminer:latest
@@ -137,6 +170,7 @@ services:
       - constructure-network
     depends_on:
       - api
+      - web
     logging:
       driver: "json-file"
       options:
@@ -147,6 +181,10 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  web_node_modules:
+    driver: local
+  web_next:
     driver: local
 
 networks:

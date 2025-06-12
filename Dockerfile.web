@@ -4,48 +4,35 @@ FROM node:18-alpine
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Устанавливаем системные зависимости
-RUN apk add --no-cache \
-    tini \
-    dumb-init \
-    curl \
-    bash
+# Копируем package.json файлы
+COPY apps/web/package*.json ./apps/web/
+COPY package*.json ./
 
-# Создаем пользователя node с правильными правами
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001
-
-# Копируем package files для установки зависимостей
-COPY --chown=nextjs:nodejs package*.json ./
-COPY --chown=nextjs:nodejs apps/web/package*.json ./apps/web/
-COPY --chown=nextjs:nodejs packages/types/package*.json ./packages/types/
-
-# Устанавливаем все зависимости для development
-RUN npm ci
+# Устанавливаем зависимости
+RUN cd apps/web && npm ci
 
 # Копируем исходный код
-COPY --chown=nextjs:nodejs apps/web ./apps/web
-COPY --chown=nextjs:nodejs packages/types ./packages/types
+COPY apps/web ./apps/web
+COPY packages ./packages
 
-# Устанавливаем все зависимости в веб директории
+# Переходим в директорию приложения
 WORKDIR /app/apps/web
-RUN npm ci
 
-# Создаем директории с правильными правами
-RUN mkdir -p /app/logs && chown -R nextjs:nodejs /app/logs && \
-    mkdir -p /app/apps/web/.next && chown -R nextjs:nodejs /app/apps/web/.next
+# Создаем непривилегированного пользователя
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
 
-# Переключаемся на пользователя nextjs
+# Меняем владельца файлов
+RUN chown -R nextjs:nodejs /app
 USER nextjs
 
-# Устанавливаем рабочую директорию
-WORKDIR /app/apps/web
-
-# Экспонируем порт
+# Открываем порт
 EXPOSE 3000
 
-# Используем tini как init процесс
-ENTRYPOINT ["/sbin/tini", "--"]
+# Устанавливаем переменную окружения
+ENV NODE_ENV=development
+ENV PORT=3000
+ENV HOST=0.0.0.0
 
-# Запускаем приложение
+# Запускаем приложение в dev режиме
 CMD ["npm", "run", "dev"] 

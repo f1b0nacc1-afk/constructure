@@ -1,212 +1,269 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Card, Spinner } from '../../../components/ui';
-import { 
-  ArrowLeftIcon, 
-  EditIcon, 
-  ShareIcon, 
-  CopyIcon, 
-  TrashIcon,
-  PlayIcon,
-  UsersIcon,
-  BookOpenIcon,
-  GlobeIcon,
-  LockIcon,
-  CalendarIcon,
-  UserIcon
-} from 'lucide-react';
+import { Button } from '../../../components/ui';
 
-// Типы данных
 interface CourseNode {
   id: string;
-  type: string;
   title: string;
-  content?: any;
-  positions: any;
-  config?: any;
-  createdAt: string;
-  updatedAt: string;
+  type: 'lesson' | 'quiz' | 'assignment';
+  description: string;
+  position: { x: number; y: number };
 }
 
-interface CourseEdge {
+interface Connection {
   id: string;
-  sourceId: string;
-  targetId: string;
-  type: string;
-  label?: string;
-  condition?: any;
-  style?: any;
-}
-
-interface CourseCollaborator {
-  id: string;
-  role: string;
-  user: {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    email: string;
-  };
+  from: string;
+  to: string;
 }
 
 interface Course {
   id: string;
   title: string;
-  description?: string;
-  thumbnail?: string;
-  isPublic: boolean;
-  isTemplate: boolean;
+  description: string;
   createdAt: string;
-  updatedAt: string;
-  author: {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    email: string;
-  };
   nodes: CourseNode[];
-  collaborators: CourseCollaborator[];
+  connections: Connection[];
 }
 
-export default function CoursePage() {
-  const params = useParams();
-  const router = useRouter();
-  const [course, setCourse] = useState<Course | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+// Данные курса (в реальном приложении будут загружаться с API)
+const getCourseData = (courseId: string): Course => {
+  // Сначала пытаемся загрузить из localStorage
+  try {
+    const savedCourse = localStorage.getItem(`course_${courseId}`);
+    if (savedCourse) {
+      const parsedCourse = JSON.parse(savedCourse);
+      console.log('Загружен курс из localStorage для просмотра:', parsedCourse);
+      return parsedCourse;
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки курса из localStorage:', error);
+  }
 
-  const courseId = params.id as string;
-
-  // Загрузка курса
-  const loadCourse = async () => {
-    try {
-      setLoading(true);
-      
-      const response = await fetch(`/api/courses/${courseId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+  // Если не найден в localStorage, используем дефолтные данные
+  const courses: Record<string, Course> = {
+    '1': {
+      id: '1',
+      title: 'Введение в программирование',
+      description: 'Основы программирования для начинающих разработчиков. В этом курсе вы изучите базовые концепции программирования, синтаксис языка и научитесь создавать простые программы.',
+      createdAt: '2024-01-15',
+      nodes: [
+        {
+          id: '1',
+          title: 'Урок 1: Что такое программирование?',
+          type: 'lesson',
+          description: 'Введение в мир программирования и основные концепции',
+          position: { x: 100, y: 100 }
+        },
+        {
+          id: '2',
+          title: 'Урок 2: Переменные и типы данных',
+          type: 'lesson',
+          description: 'Изучаем основные типы данных и работу с переменными',
+          position: { x: 400, y: 100 }
+        },
+        {
+          id: '3', 
+          title: 'Тест: Проверка знаний основ',
+          type: 'quiz',
+          description: 'Проверьте свои знания по пройденному материалу',
+          position: { x: 250, y: 250 }
         }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCourse(data.course);
-      } else if (response.status === 404) {
-        router.push('/courses');
-      } else {
-        console.error('Ошибка загрузки курса');
-      }
-    } catch (error) {
-      console.error('Ошибка:', error);
-    } finally {
-      setLoading(false);
+      ],
+      connections: [
+        { id: 'conn1', from: '1', to: '2' },
+        { id: 'conn2', from: '2', to: '3' }
+      ]
+    },
+    '2': {
+      id: '2',
+      title: 'Основы дизайна',
+      description: 'Принципы графического дизайна и композиции',
+      createdAt: '2024-01-10',
+      nodes: [
+        {
+          id: '1',
+          title: 'Введение в дизайн',
+          type: 'lesson',
+          description: 'Основные принципы дизайна',
+          position: { x: 200, y: 100 }
+        },
+        {
+          id: '2',
+          title: 'Цветовая теория',
+          type: 'lesson',
+          description: 'Работа с цветом в дизайне',
+          position: { x: 200, y: 250 }
+        },
+        {
+          id: '3',
+          title: 'Тест по цветам',
+          type: 'quiz',
+          description: 'Проверка знаний цветовой теории',
+          position: { x: 200, y: 400 }
+        }
+      ],
+      connections: [
+        { id: 'conn1', from: '1', to: '2' },
+        { id: 'conn2', from: '2', to: '3' }
+      ]
+    },
+    '3': {
+      id: '3',
+      title: 'Управление проектами',
+      description: 'Методология Agile и Scrum',
+      createdAt: '2024-01-05',
+      nodes: [
+        {
+          id: '1',
+          title: 'Введение в Agile',
+          type: 'lesson',
+          description: 'Основы гибкой методологии разработки',
+          position: { x: 100, y: 100 }
+        },
+        {
+          id: '2',
+          title: 'Scrum фреймворк',
+          type: 'lesson',
+          description: 'Изучение Scrum процессов',
+          position: { x: 300, y: 100 }
+        },
+        {
+          id: '3',
+          title: 'Kanban доска',
+          type: 'lesson',
+          description: 'Работа с Kanban методологией',
+          position: { x: 500, y: 100 }
+        },
+        {
+          id: '4',
+          title: 'Тест по Agile',
+          type: 'quiz',
+          description: 'Проверка знаний Agile методологии',
+          position: { x: 200, y: 250 }
+        },
+        {
+          id: '5',
+          title: 'Практическое задание: Планирование спринта',
+          type: 'assignment',
+          description: 'Создайте план спринта для проекта',
+          position: { x: 400, y: 250 }
+        }
+      ],
+      connections: [
+        { id: 'conn1', from: '1', to: '2' },
+        { id: 'conn2', from: '2', to: '3' },
+        { id: 'conn3', from: '1', to: '4' },
+        { id: 'conn4', from: '3', to: '5' }
+      ]
     }
   };
+
+  return courses[courseId] || {
+    id: courseId,
+    title: `Курс ${courseId}`,
+    description: 'Описание курса',
+    createdAt: new Date().toISOString(),
+    nodes: [],
+    connections: []
+  };
+};
+
+const getNodeTypeIcon = (type: string) => {
+  switch (type) {
+    case 'lesson': return '📚';
+    case 'quiz': return '❓';
+    case 'assignment': return '📝';
+    default: return '📄';
+  }
+};
+
+const getNodeTypeColor = (type: string) => {
+  switch (type) {
+    case 'lesson': return 'bg-blue-500';
+    case 'quiz': return 'bg-yellow-500';
+    case 'assignment': return 'bg-purple-500';
+    default: return 'bg-gray-500';
+  }
+};
+
+// Функция для сортировки узлов по логическому порядку (на основе соединений)
+const getSortedNodes = (nodes: CourseNode[], connections: Connection[]): CourseNode[] => {
+  // Создаем граф зависимостей
+  const graph: Record<string, string[]> = {};
+  const inDegree: Record<string, number> = {};
+  
+  // Инициализируем
+  nodes.forEach(node => {
+    graph[node.id] = [];
+    inDegree[node.id] = 0;
+  });
+  
+  // Строим граф
+  connections.forEach(conn => {
+    if (graph[conn.from] && inDegree[conn.to] !== undefined) {
+      graph[conn.from].push(conn.to);
+      inDegree[conn.to]++;
+    }
+  });
+  
+  // Топологическая сортировка
+  const queue: string[] = [];
+  const result: string[] = [];
+  
+  // Находим узлы без входящих связей
+  Object.keys(inDegree).forEach(nodeId => {
+    if (inDegree[nodeId] === 0) {
+      queue.push(nodeId);
+    }
+  });
+  
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    result.push(current);
+    
+    graph[current].forEach(neighbor => {
+      inDegree[neighbor]--;
+      if (inDegree[neighbor] === 0) {
+        queue.push(neighbor);
+      }
+    });
+  }
+  
+  // Если есть циклы, добавляем оставшиеся узлы
+  nodes.forEach(node => {
+    if (!result.includes(node.id)) {
+      result.push(node.id);
+    }
+  });
+  
+  // Возвращаем отсортированные узлы
+  return result.map(id => nodes.find(node => node.id === id)!).filter(Boolean);
+};
+
+export default function CoursePage() {
+  const router = useRouter();
+  const params = useParams();
+  const [course, setCourse] = useState<Course | null>(null);
+  const [sortedNodes, setSortedNodes] = useState<CourseNode[]>([]);
 
   useEffect(() => {
-    if (courseId) {
-      loadCourse();
-    }
-  }, [courseId]);
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ru-RU', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getAuthorName = (author: Course['author']) => {
-    if (author.firstName || author.lastName) {
-      return `${author.firstName || ''} ${author.lastName || ''}`.trim();
-    }
-    return author.email;
-  };
-
-  const handleDuplicate = async () => {
-    if (!course) return;
+    // Загружаем данные курса
+    const courseData = getCourseData(params.id as string);
+    setCourse(courseData);
     
-    try {
-      setActionLoading(true);
-      
-      const response = await fetch(`/api/courses/${course.id}/duplicate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        router.push(`/courses/${data.course.id}`);
-      } else {
-        console.error('Ошибка дублирования курса');
-      }
-    } catch (error) {
-      console.error('Ошибка:', error);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!course) return;
-    
-    if (!confirm('Вы уверены, что хотите удалить этот курс? Это действие нельзя отменить.')) {
-      return;
-    }
-    
-    try {
-      setActionLoading(true);
-      
-      const response = await fetch(`/api/courses/${course.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        }
-      });
-
-      if (response.ok) {
-        router.push('/courses');
-      } else {
-        console.error('Ошибка удаления курса');
-      }
-    } catch (error) {
-      console.error('Ошибка:', error);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Spinner size="lg" />
-          <p className="mt-4 text-gray-600">Загрузка курса...</p>
-        </div>
-      </div>
-    );
-  }
+    // Сортируем узлы по логическому порядку
+    const sorted = getSortedNodes(courseData.nodes, courseData.connections);
+    setSortedNodes(sorted);
+  }, [params.id]);
 
   if (!course) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Курс не найден</h2>
-          <p className="text-gray-600 mb-4">Возможно, курс был удален или у вас нет прав доступа</p>
-          <Link href="/courses">
-            <Button>
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              Вернуться к курсам
-            </Button>
-          </Link>
+          <div className="text-gray-400 text-lg mb-2">Загрузка курса...</div>
         </div>
       </div>
     );
@@ -214,216 +271,156 @@ export default function CoursePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Заголовок */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
-              <Link 
-                href="/courses" 
-                className="mt-1 p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
-              </Link>
-              
-              <div className="flex-1">
-                {/* Превью изображение */}
-                {course.thumbnail && (
-                  <div className="w-32 h-20 bg-gray-100 rounded-lg overflow-hidden mb-4">
-                    <img
-                      src={course.thumbnail}
-                      alt={course.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-                
-                <div className="flex items-center space-x-2 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
-                  
-                  {/* Бейджи */}
-                  {course.isPublic ? (
-                    <span className="bg-green-100 text-green-800 text-sm px-2 py-1 rounded-full flex items-center">
-                      <GlobeIcon className="w-3 h-3 mr-1" />
-                      Публичный
-                    </span>
-                  ) : (
-                    <span className="bg-gray-100 text-gray-800 text-sm px-2 py-1 rounded-full flex items-center">
-                      <LockIcon className="w-3 h-3 mr-1" />
-                      Приватный
-                    </span>
-                  )}
-                  
-                  {course.isTemplate && (
-                    <span className="bg-purple-100 text-purple-800 text-sm px-2 py-1 rounded-full">
-                      Шаблон
-                    </span>
-                  )}
-                </div>
-                
-                {course.description && (
-                  <p className="text-gray-600 mb-4 max-w-2xl">{course.description}</p>
-                )}
-                
-                {/* Метаинформация */}
-                <div className="flex items-center space-x-6 text-sm text-gray-500">
-                  <div className="flex items-center">
-                    <UserIcon className="w-4 h-4 mr-1" />
-                    {getAuthorName(course.author)}
-                  </div>
-                  <div className="flex items-center">
-                    <BookOpenIcon className="w-4 h-4 mr-1" />
-                    {course.nodes.length} блоков
-                  </div>
-                  <div className="flex items-center">
-                    <UsersIcon className="w-4 h-4 mr-1" />
-                    {course.collaborators.length} участников
-                  </div>
-                  <div className="flex items-center">
-                    <CalendarIcon className="w-4 h-4 mr-1" />
-                    Обновлен {formatDate(course.updatedAt)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Действия */}
-            <div className="flex items-center space-x-2 ml-4">
-              <Link href={`/courses/${course.id}/edit`}>
-                <Button>
-                  <EditIcon className="w-4 h-4 mr-2" />
-                  Редактировать
-                </Button>
-              </Link>
-              
-              <Link href={`/courses/${course.id}/preview`}>
-                <Button variant="secondary">
-                  <PlayIcon className="w-4 h-4 mr-2" />
-                  Предпросмотр
-                </Button>
-              </Link>
-              
-              <Button
-                variant="secondary"
-                onClick={handleDuplicate}
-                disabled={actionLoading}
-              >
-                <CopyIcon className="w-4 h-4 mr-2" />
-                Дублировать
-              </Button>
-              
-              <Button variant="secondary">
-                <ShareIcon className="w-4 h-4 mr-2" />
-                Поделиться
-              </Button>
-              
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={actionLoading}
-              >
-                <TrashIcon className="w-4 h-4 mr-2" />
-                Удалить
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Контент */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Основная информация */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Структура курса */}
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Структура курса
-              </h2>
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {course.title}
+              </h1>
+              <p className="text-gray-600 text-lg mb-4">
+                {course.description}
+              </p>
               
-              {course.nodes.length === 0 ? (
-                <div className="text-center py-8">
-                  <BookOpenIcon className="mx-auto w-12 h-12 text-gray-400 mb-4" />
-                  <p className="text-gray-600 mb-4">Курс пока не содержит блоков</p>
-                  <Link href={`/courses/${course.id}/edit`}>
-                    <Button>
-                      <EditIcon className="w-4 h-4 mr-2" />
-                      Начать редактирование
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {course.nodes.map((node, index) => (
-                    <div
-                      key={node.id}
-                      className="flex items-center p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium mr-3">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{node.title}</h4>
-                        <p className="text-sm text-gray-500 capitalize">{node.type}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
-
-          {/* Боковая панель */}
-          <div className="space-y-6">
-            {/* Участники */}
-            {course.collaborators.length > 0 && (
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Участники
-                </h3>
-                <div className="space-y-3">
-                  {course.collaborators.map((collaborator) => (
-                    <div key={collaborator.id} className="flex items-center">
-                      <div className="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0 mr-3"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">
-                          {collaborator.user.firstName || collaborator.user.lastName
-                            ? `${collaborator.user.firstName || ''} ${collaborator.user.lastName || ''}`.trim()
-                            : collaborator.user.email
-                          }
-                        </p>
-                        <p className="text-xs text-gray-500 capitalize">{collaborator.role}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {/* Статистика */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Статистика
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Блоков:</span>
-                  <span className="font-medium">{course.nodes.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Участников:</span>
-                  <span className="font-medium">{course.collaborators.length + 1}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Создан:</span>
-                  <span className="font-medium text-sm">
-                    {formatDate(course.createdAt)}
-                  </span>
-                </div>
+              <div className="flex items-center gap-6 text-sm text-gray-500">
+                <span>📚 {course.nodes.length} элементов</span>
+                <span>🔗 {course.connections.length} соединений</span>
+                <span>📅 Создан {new Date(course.createdAt).toLocaleDateString('ru-RU')}</span>
+                <span>🆔 ID: {params.id}</span>
               </div>
-            </Card>
+            </div>
+            
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => router.push('/courses')}
+              >
+                ← Назад к курсам
+              </Button>
+              <Link href={`/courses/${params.id}/edit`}>
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  ✏️ Редактировать
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
+
+        {/* Course Structure */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Структура курса
+            </h2>
+            <p className="text-gray-600 mt-1">
+              Последовательность изучения материала ({sortedNodes.length} элементов)
+            </p>
+          </div>
+          
+          <div className="p-6">
+            {sortedNodes.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 text-lg mb-2">Курс пуст</div>
+                <div className="text-gray-500 text-sm mb-4">
+                  В этом курсе пока нет элементов
+                </div>
+                <Link href={`/courses/${params.id}/edit`}>
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                    ✏️ Добавить элементы
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sortedNodes.map((node, index) => (
+                  <div
+                    key={node.id}
+                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium text-gray-600 mr-4">
+                      {index + 1}
+                    </div>
+                    
+                    <div className={`flex-shrink-0 w-3 h-3 rounded-full mr-4 ${getNodeTypeColor(node.type)}`}></div>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{getNodeTypeIcon(node.type)}</span>
+                        <h3 className="font-medium text-gray-900">
+                          {node.title}
+                        </h3>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {node.description}
+                      </p>
+                    </div>
+                    
+                    <div className="flex-shrink-0">
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium text-white ${getNodeTypeColor(node.type)}`}>
+                        {node.type === 'lesson' ? 'Урок' : 
+                         node.type === 'quiz' ? 'Тест' : 'Задание'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Course Statistics */}
+        {course.nodes.length > 0 && (
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <span className="text-blue-600 text-lg">📚</span>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">Уроки</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {course.nodes.filter(n => n.type === 'lesson').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <span className="text-yellow-600 text-lg">❓</span>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">Тесты</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {course.nodes.filter(n => n.type === 'quiz').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <span className="text-purple-600 text-lg">📝</span>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">Задания</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {course.nodes.filter(n => n.type === 'assignment').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

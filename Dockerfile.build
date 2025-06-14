@@ -1,0 +1,31 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Копируем package files для всех пакетов
+COPY package*.json ./
+COPY apps/web/package*.json ./apps/web/
+COPY packages/types/package*.json ./packages/types/
+COPY packages/ui/package*.json ./packages/ui/
+COPY packages/utils/package*.json ./packages/utils/
+COPY packages/config/package*.json ./packages/config/
+
+# Устанавливаем зависимости
+RUN npm install --legacy-peer-deps
+
+# Копируем все исходники
+COPY packages ./packages/
+COPY apps/web ./apps/web/
+
+# Собираем пакеты
+RUN cd packages/types && npm run build
+RUN cd packages/utils && npm run build || echo "No build script"
+RUN cd packages/ui && npm run build || echo "No build script"
+RUN cd packages/config && npm run build || echo "No build script"
+
+# Собираем приложение
+RUN cd apps/web && npm run build
+
+# Финальный образ - только статические файлы
+FROM scratch AS export
+COPY --from=build /app/apps/web/dist / 

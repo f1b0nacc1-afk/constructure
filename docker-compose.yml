@@ -71,8 +71,8 @@ services:
       HOST: "0.0.0.0"
       LOG_LEVEL: debug
       LOG_FILE: /app/logs/api.log
-      CORS_ORIGIN: "http://localhost:3000"
-      FRONTEND_URL: "http://localhost:3000"
+      CORS_ORIGIN: "http://localhost:8000"
+      FRONTEND_URL: "http://localhost:8000"
     ports:
       - "3001:3001"
     volumes:
@@ -99,7 +99,7 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  # Веб-приложение
+  # Next.js Web приложение
   web:
     build:
       context: .
@@ -108,24 +108,20 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      API_URL: http://api:3001
-      LOG_LEVEL: debug
+      NEXT_PUBLIC_API_URL: "http://localhost:8000/api"
+      PORT: 3000
+      HOST: "0.0.0.0"
     ports:
       - "3000:3000"
     volumes:
-      - ./apps/web:/app/apps/web:ro
-      - ./packages:/app/packages:ro
-      - ./logs/web:/app/logs
-      - /app/apps/web/node_modules
-      - /app/apps/web/.next
+      - web_node_modules:/app/apps/web/node_modules
+      - web_next:/app/apps/web/.next
     networks:
       - constructure-network
     depends_on:
-      api:
-        condition: service_healthy
+      - api
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -157,13 +153,13 @@ services:
         max-size: "5m"
         max-file: "2"
 
-  # Nginx для reverse proxy и статических файлов
+  # Nginx для раздачи статики и API proxy
   nginx:
     image: nginx:alpine
     container_name: constructure-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8000:80"
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -172,8 +168,8 @@ services:
     networks:
       - constructure-network
     depends_on:
-      - web
       - api
+      - web
     logging:
       driver: "json-file"
       options:
@@ -184,6 +180,10 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  web_node_modules:
+    driver: local
+  web_next:
     driver: local
 
 networks:

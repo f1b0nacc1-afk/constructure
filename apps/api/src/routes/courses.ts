@@ -16,7 +16,7 @@ const createCourseSchema = z.object({
 const updateCourseSchema = createCourseSchema.partial();
 
 const courseParamsSchema = z.object({
-  id: z.string().cuid()
+  id: z.string().min(1)
 });
 
 const coursesQuerySchema = z.object({
@@ -43,7 +43,7 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
   }>('/', async (request, reply) => {
     try {
       const { page, limit, search, isPublic, isTemplate } = coursesQuerySchema.parse(request.query);
-      const userId = request.user?.userId;
+      const userId = request.user.userId;
       
       if (!userId) {
         return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
@@ -142,7 +142,7 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
   }>('/:id', async (request, reply) => {
     try {
       const { id } = courseParamsSchema.parse(request.params);
-      const userId = request.user?.userId;
+      const userId = request.user.userId;
       
       if (!userId) {
         return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
@@ -208,7 +208,7 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
   }>('/', async (request, reply) => {
     try {
       const courseData = createCourseSchema.parse(request.body);
-      const userId = request.user?.userId;
+      const userId = request.user.userId;
       
       if (!userId) {
         return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
@@ -216,8 +216,12 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
 
       const course = await prisma.course.create({
         data: {
-          ...courseData,
-          authorId: userId
+          authorId: userId,
+          title: courseData.title,
+          description: courseData.description,
+          thumbnail: courseData.thumbnail,
+          isPublic: courseData.isPublic,
+          isTemplate: courseData.isTemplate
         },
         include: {
           author: {
@@ -246,13 +250,13 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
 
   // PUT /api/courses/:id - Обновить курс
   fastify.put<{ 
-    Params: z.infer<typeof courseParamsSchema>;
+    Params: z.infer<typeof courseParamsSchema>,
     Body: z.infer<typeof updateCourseSchema> 
   }>('/:id', async (request, reply) => {
     try {
       const { id } = courseParamsSchema.parse(request.params);
-      const courseData = updateCourseSchema.parse(request.body);
-      const userId = request.user?.userId;
+      const updateData = updateCourseSchema.parse(request.body);
+      const userId = request.user.userId;
       
       if (!userId) {
         return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
@@ -282,7 +286,7 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
 
       const updatedCourse = await prisma.course.update({
         where: { id },
-        data: courseData,
+        data: updateData,
         include: {
           author: {
             select: {
@@ -314,7 +318,7 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
   }>('/:id', async (request, reply) => {
     try {
       const { id } = courseParamsSchema.parse(request.params);
-      const userId = request.user?.userId;
+      const userId = request.user.userId;
       
       if (!userId) {
         return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
@@ -349,7 +353,7 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
   }>('/:id/duplicate', async (request, reply) => {
     try {
       const { id } = courseParamsSchema.parse(request.params);
-      const userId = request.user?.userId;
+      const userId = request.user.userId;
       
       if (!userId) {
         return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
@@ -446,6 +450,573 @@ export default async function coursesRoutes(fastify: FastifyInstance) {
       });
 
       return reply.code(201).send({ course: duplicatedCourse });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // === УЗЛЫ КУРСА ===
+
+  // GET /api/courses/:id/nodes - Получить все узлы курса
+  fastify.get<{ 
+    Params: z.infer<typeof courseParamsSchema> 
+  }>('/:id/nodes', async (request, reply) => {
+    try {
+      const { id } = courseParamsSchema.parse(request.params);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем доступ к курсу
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId } } },
+            { isPublic: true }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(404).send({ error: 'Курс не найден' });
+      }
+
+      const nodes = await prisma.courseNode.findMany({
+        where: { courseId: id },
+        orderBy: { createdAt: 'asc' }
+      });
+
+      return reply.send({ nodes });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // POST /api/courses/:id/nodes - Создать узел курса
+  const createNodeSchema = z.object({
+    type: z.enum(['LESSON', 'TEST', 'ASSIGNMENT', 'VIDEO', 'DOCUMENT', 'INTERACTIVE', 'CONDITION', 'START', 'END']),
+    title: z.string().min(1, 'Название обязательно'),
+    content: z.any().optional(),
+    positions: z.object({
+      tree: z.object({ x: z.number(), y: z.number() }),
+      lego: z.object({ x: z.number(), y: z.number() }),
+      mindmap: z.object({ x: z.number(), y: z.number() }),
+      flowchart: z.object({ x: z.number(), y: z.number() })
+    }),
+    config: z.any().optional()
+  });
+
+  fastify.post<{ 
+    Params: z.infer<typeof courseParamsSchema>,
+    Body: z.infer<typeof createNodeSchema>
+  }>('/:id/nodes', async (request, reply) => {
+    try {
+      const { id } = courseParamsSchema.parse(request.params);
+      const nodeData = createNodeSchema.parse(request.body);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      const node = await prisma.courseNode.create({
+        data: {
+          courseId: id,
+          type: nodeData.type,
+          title: nodeData.title,
+          content: nodeData.content,
+          positions: nodeData.positions,
+          config: nodeData.config
+        }
+      });
+
+      return reply.code(201).send({ node });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // PUT /api/courses/:id/nodes/:nodeId - Обновить узел курса
+  const updateNodeSchema = createNodeSchema.partial();
+
+  fastify.put<{ 
+    Params: z.infer<typeof courseParamsSchema> & { nodeId: string },
+    Body: z.infer<typeof updateNodeSchema>
+  }>('/:id/nodes/:nodeId', async (request, reply) => {
+    try {
+      const { id, nodeId } = request.params;
+      const nodeData = updateNodeSchema.parse(request.body);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      // Проверяем существование узла
+      const existingNode = await prisma.courseNode.findFirst({
+        where: { id: nodeId, courseId: id }
+      });
+
+      if (!existingNode) {
+        return reply.code(404).send({ error: 'Узел не найден' });
+      }
+
+      const updatedNode = await prisma.courseNode.update({
+        where: { id: nodeId },
+        data: nodeData
+      });
+
+      return reply.send({ node: updatedNode });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // DELETE /api/courses/:id/nodes/:nodeId - Удалить узел курса
+  fastify.delete<{ 
+    Params: z.infer<typeof courseParamsSchema> & { nodeId: string }
+  }>('/:id/nodes/:nodeId', async (request, reply) => {
+    try {
+      const { id, nodeId } = request.params;
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      // Проверяем существование узла
+      const existingNode = await prisma.courseNode.findFirst({
+        where: { id: nodeId, courseId: id }
+      });
+
+      if (!existingNode) {
+        return reply.code(404).send({ error: 'Узел не найден' });
+      }
+
+      await prisma.courseNode.delete({
+        where: { id: nodeId }
+      });
+
+      return reply.code(204).send();
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // === СВЯЗИ КУРСА ===
+
+  // GET /api/courses/:id/edges - Получить все связи курса
+  fastify.get<{ 
+    Params: z.infer<typeof courseParamsSchema> 
+  }>('/:id/edges', async (request, reply) => {
+    try {
+      const { id } = courseParamsSchema.parse(request.params);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем доступ к курсу
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId } } },
+            { isPublic: true }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(404).send({ error: 'Курс не найден' });
+      }
+
+      const edges = await prisma.courseEdge.findMany({
+        where: { courseId: id },
+        orderBy: { createdAt: 'asc' }
+      });
+
+      return reply.send({ edges });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // POST /api/courses/:id/edges - Создать связь курса
+  const createEdgeSchema = z.object({
+    sourceId: z.string().min(1, 'ID источника обязательно'),
+    targetId: z.string().min(1, 'ID цели обязательно'),
+    type: z.enum(['SEQUENCE', 'CONDITION', 'REFERENCE']).default('SEQUENCE'),
+    label: z.string().optional(),
+    condition: z.any().optional(),
+    style: z.any().optional()
+  });
+
+  fastify.post<{ 
+    Params: z.infer<typeof courseParamsSchema>,
+    Body: z.infer<typeof createEdgeSchema>
+  }>('/:id/edges', async (request, reply) => {
+    try {
+      const { id } = courseParamsSchema.parse(request.params);
+      const edgeData = createEdgeSchema.parse(request.body);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      // Проверяем существование узлов
+      const sourceNode = await prisma.courseNode.findFirst({
+        where: { id: edgeData.sourceId, courseId: id }
+      });
+      const targetNode = await prisma.courseNode.findFirst({
+        where: { id: edgeData.targetId, courseId: id }
+      });
+
+      if (!sourceNode || !targetNode) {
+        return reply.code(400).send({ error: 'Один или оба узла не найдены' });
+      }
+
+      // Проверяем на существующую связь
+      const existingEdge = await prisma.courseEdge.findFirst({
+        where: {
+          courseId: id,
+          sourceId: edgeData.sourceId,
+          targetId: edgeData.targetId
+        }
+      });
+
+      if (existingEdge) {
+        return reply.code(400).send({ error: 'Связь между этими узлами уже существует' });
+      }
+
+      const edge = await prisma.courseEdge.create({
+        data: {
+          courseId: id,
+          sourceId: edgeData.sourceId,
+          targetId: edgeData.targetId,
+          type: edgeData.type,
+          label: edgeData.label,
+          condition: edgeData.condition,
+          style: edgeData.style
+        }
+      });
+
+      return reply.code(201).send({ edge });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // PUT /api/courses/:id/edges/:edgeId - Обновить связь курса
+  const updateEdgeSchema = createEdgeSchema.partial();
+
+  fastify.put<{ 
+    Params: z.infer<typeof courseParamsSchema> & { edgeId: string },
+    Body: z.infer<typeof updateEdgeSchema>
+  }>('/:id/edges/:edgeId', async (request, reply) => {
+    try {
+      const { id, edgeId } = request.params;
+      const edgeData = updateEdgeSchema.parse(request.body);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      // Проверяем существование связи
+      const existingEdge = await prisma.courseEdge.findFirst({
+        where: { id: edgeId, courseId: id }
+      });
+
+      if (!existingEdge) {
+        return reply.code(404).send({ error: 'Связь не найдена' });
+      }
+
+      const updatedEdge = await prisma.courseEdge.update({
+        where: { id: edgeId },
+        data: edgeData
+      });
+
+      return reply.send({ edge: updatedEdge });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // DELETE /api/courses/:id/edges/:edgeId - Удалить связь курса
+  fastify.delete<{ 
+    Params: z.infer<typeof courseParamsSchema> & { edgeId: string }
+  }>('/:id/edges/:edgeId', async (request, reply) => {
+    try {
+      const { id, edgeId } = request.params;
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      // Проверяем существование связи
+      const existingEdge = await prisma.courseEdge.findFirst({
+        where: { id: edgeId, courseId: id }
+      });
+
+      if (!existingEdge) {
+        return reply.code(404).send({ error: 'Связь не найдена' });
+      }
+
+      await prisma.courseEdge.delete({
+        where: { id: edgeId }
+      });
+
+      return reply.code(204).send();
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // === МАКЕТЫ КУРСА ===
+
+  // PUT /api/courses/:id/layout - Сохранить позиции узлов для определенного макета
+  const saveLayoutSchema = z.object({
+    mode: z.enum(['tree', 'lego', 'mindmap', 'flowchart']),
+    positions: z.record(z.string(), z.object({
+      x: z.number(),
+      y: z.number()
+    }))
+  });
+
+  fastify.put<{ 
+    Params: z.infer<typeof courseParamsSchema>,
+    Body: z.infer<typeof saveLayoutSchema>
+  }>('/:id/layout', async (request, reply) => {
+    try {
+      const { id } = courseParamsSchema.parse(request.params);
+      const { mode, positions } = saveLayoutSchema.parse(request.body);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      // Обновляем позиции узлов
+      const updates = Object.entries(positions).map(([nodeId, position]) => {
+        return prisma.courseNode.updateMany({
+          where: { 
+            id: nodeId, 
+            courseId: id 
+          },
+          data: {
+            positions: {
+              path: [mode],
+              set: position
+            }
+          }
+        });
+      });
+
+      await Promise.all(updates);
+
+      return reply.send({ success: true });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // PUT /api/courses/:id/nodes/positions - Массовое обновление позиций узлов
+  const massUpdatePositionsSchema = z.object({
+    positions: z.array(z.object({
+      nodeId: z.string(),
+      positions: z.object({
+        tree: z.object({ x: z.number(), y: z.number() }).optional(),
+        lego: z.object({ x: z.number(), y: z.number() }).optional(),
+        mindmap: z.object({ x: z.number(), y: z.number() }).optional(),
+        flowchart: z.object({ x: z.number(), y: z.number() }).optional()
+      })
+    }))
+  });
+
+  fastify.put<{ 
+    Params: z.infer<typeof courseParamsSchema>,
+    Body: z.infer<typeof massUpdatePositionsSchema>
+  }>('/:id/nodes/positions', async (request, reply) => {
+    try {
+      const { id } = courseParamsSchema.parse(request.params);
+      const { positions } = massUpdatePositionsSchema.parse(request.body);
+      const userId = request.user.userId;
+      
+      if (!userId) {
+        return reply.code(401).send({ error: 'Пользователь не аутентифицирован' });
+      }
+
+      // Проверяем права на редактирование курса
+      const course = await prisma.course.findFirst({
+        where: {
+          id,
+          OR: [
+            { authorId: userId },
+            { collaborators: { some: { userId: userId, role: { in: ['OWNER', 'EDITOR'] } } } }
+          ]
+        }
+      });
+
+      if (!course) {
+        return reply.code(403).send({ error: 'Нет прав на редактирование курса' });
+      }
+
+      // Массовое обновление позиций в транзакции для производительности
+      await prisma.$transaction(async (tx) => {
+        for (const positionUpdate of positions) {
+          // Получаем текущие позиции узла
+          const currentNode = await tx.courseNode.findFirst({
+            where: { 
+              id: positionUpdate.nodeId, 
+              courseId: id 
+            },
+            select: { positions: true }
+          });
+
+          if (currentNode) {
+            // Объединяем текущие позиции с новыми
+            const mergedPositions = {
+              ...(currentNode.positions as any),
+              ...positionUpdate.positions
+            };
+
+            // Обновляем узел
+            await tx.courseNode.update({
+              where: { id: positionUpdate.nodeId },
+              data: { positions: mergedPositions }
+            });
+          }
+        }
+      });
+
+      return reply.send({ 
+        success: true, 
+        message: `Обновлено позиций для ${positions.length} узлов` 
+      });
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Внутренняя ошибка сервера' });

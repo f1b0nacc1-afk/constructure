@@ -2,127 +2,137 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Button, Card, Input, Spinner } from '../../components/ui';
-import { PlusIcon, SearchIcon, BookOpenIcon, UsersIcon, GlobeIcon, LockIcon } from 'lucide-react';
+import { Button } from '../../components/ui';
 
-// Типы для курсов
 interface Course {
   id: string;
   title: string;
-  description?: string;
-  thumbnail?: string;
-  isPublic: boolean;
-  isTemplate: boolean;
+  description: string;
   createdAt: string;
-  updatedAt: string;
-  author: {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    email: string;
-  };
-  _count: {
-    nodes: number;
-    collaborators: number;
-  };
+  nodeCount: number;
+  connectionsCount?: number;
 }
 
-interface CoursesResponse {
-  courses: Course[];
-  pagination: {
-    page: number;
-    limit: number;
-    totalCount: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
+interface CourseData {
+  id: string;
+  title: string;
+  description: string;
+  nodes: any[];
+  connections: any[];
 }
+
+// Функция для получения всех курсов (дефолтные + созданные пользователем)
+const getAllCourses = (): Course[] => {
+  const courses: Course[] = [];
+  
+  // Дефолтные курсы
+  const defaultCourses = [
+    {
+      id: '1',
+      title: 'Введение в программирование',
+      description: 'Основы программирования для начинающих',
+      createdAt: '2024-01-15',
+      nodeCount: 3
+    },
+    {
+      id: '2',
+      title: 'Основы дизайна',
+      description: 'Принципы графического дизайна и композиции',
+      createdAt: '2024-01-10',
+      nodeCount: 3
+    },
+    {
+      id: '3',
+      title: 'Управление проектами',
+      description: 'Методология Agile и Scrum',
+      createdAt: '2024-01-05',
+      nodeCount: 5
+    }
+  ];
+
+  // Проверяем localStorage для каждого дефолтного курса
+  defaultCourses.forEach(defaultCourse => {
+    try {
+      const savedCourse = localStorage.getItem(`course_${defaultCourse.id}`);
+      if (savedCourse) {
+        const courseData: CourseData = JSON.parse(savedCourse);
+        courses.push({
+          id: courseData.id,
+          title: courseData.title,
+          description: courseData.description,
+          createdAt: defaultCourse.createdAt,
+          nodeCount: courseData.nodes.length,
+          connectionsCount: courseData.connections.length
+        });
+      } else {
+        courses.push(defaultCourse);
+      }
+    } catch (error) {
+      console.error(`Ошибка загрузки курса ${defaultCourse.id}:`, error);
+      courses.push(defaultCourse);
+    }
+  });
+
+  // Добавляем созданные пользователем курсы
+  try {
+    const coursesList = localStorage.getItem('courses_list');
+    if (coursesList) {
+      const userCourses = JSON.parse(coursesList);
+      userCourses.forEach((userCourse: any) => {
+        // Проверяем, что это не дефолтный курс
+        if (!['1', '2', '3'].includes(userCourse.id)) {
+          courses.push({
+            id: userCourse.id,
+            title: userCourse.title,
+            description: userCourse.description,
+            createdAt: userCourse.createdAt,
+            nodeCount: userCourse.elementsCount || 0,
+            connectionsCount: userCourse.connectionsCount || 0
+          });
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки списка курсов:', error);
+  }
+
+  return courses.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'my' | 'public' | 'templates'>('all');
-  const [pagination, setPagination] = useState({
-    page: 1,
-    totalPages: 1,
-    hasNextPage: false,
-    hasPrevPage: false
-  });
 
-  // Загрузка курсов
-  const loadCourses = async (page = 1, searchQuery = search) => {
-    try {
-      setLoading(true);
-      
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '12',
-        ...(searchQuery && { search: searchQuery }),
-        ...(filter === 'public' && { isPublic: 'true' }),
-        ...(filter === 'templates' && { isTemplate: 'true' })
-      });
-
-      const response = await fetch(`/api/courses?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        }
-      });
-
-      if (response.ok) {
-        const data: CoursesResponse = await response.json();
-        setCourses(data.courses);
-        setPagination({
-          page: data.pagination.page,
-          totalPages: data.pagination.totalPages,
-          hasNextPage: data.pagination.hasNextPage,
-          hasPrevPage: data.pagination.hasPrevPage
-        });
-      } else {
-        console.error('Ошибка загрузки курсов');
+  useEffect(() => {
+    // Загружаем курсы при монтировании компонента
+    const loadCourses = () => {
+      try {
+        const allCourses = getAllCourses();
+        setCourses(allCourses);
+        console.log('Загружено курсов:', allCourses.length);
+      } catch (error) {
+        console.error('Ошибка загрузки курсов:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Ошибка:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => {
     loadCourses();
-  }, [filter]);
 
-  // Поиск с задержкой
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      loadCourses(1, search);
-    }, 300);
+    // Обновляем список при изменении localStorage
+    const handleStorageChange = () => {
+      loadCourses();
+    };
 
-    return () => clearTimeout(timeoutId);
-  }, [search]);
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ru-RU', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
-
-  const getAuthorName = (author: Course['author']) => {
-    if (author.firstName || author.lastName) {
-      return `${author.firstName || ''} ${author.lastName || ''}`.trim();
-    }
-    return author.email;
-  };
-
-  if (loading && courses.length === 0) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Spinner size="lg" />
-          <p className="mt-4 text-gray-600">Загрузка курсов...</p>
+          <div className="text-gray-400 text-lg mb-2">Загрузка курсов...</div>
         </div>
       </div>
     );
@@ -130,191 +140,90 @@ export default function CoursesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Заголовок */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Мои курсы</h1>
-              <p className="mt-2 text-gray-600">
-                Создавайте и редактируйте образовательные курсы
-              </p>
-            </div>
-            <div className="mt-4 sm:mt-0">
-              <Link href="/courses/new">
-                <Button>
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Создать курс
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Фильтры и поиск */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          {/* Поиск */}
-          <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Поиск курсов..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          {/* Фильтры */}
-          <div className="flex gap-2">
-            {[
-              { key: 'all', label: 'Все' },
-              { key: 'my', label: 'Мои' },
-              { key: 'public', label: 'Публичные' },
-              { key: 'templates', label: 'Шаблоны' }
-            ].map((filterOption) => (
-              <Button
-                key={filterOption.key}
-                variant={filter === filterOption.key ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setFilter(filterOption.key as any)}
-              >
-                {filterOption.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* Список курсов */}
-        {courses.length === 0 ? (
-          <div className="text-center py-12">
-            <BookOpenIcon className="mx-auto w-12 h-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">
-              {search ? 'Курсы не найдены' : 'Нет курсов'}
-            </h3>
-            <p className="mt-2 text-gray-600">
-              {search 
-                ? 'Попробуйте изменить поисковый запрос' 
-                : 'Создайте свой первый курс, чтобы начать работу'
-              }
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Мои курсы</h1>
+            <p className="text-gray-600 mt-2">
+              Управляйте своими образовательными курсами ({courses.length} курсов)
             </p>
-            {!search && (
-              <div className="mt-6">
-                <Link href="/courses/new">
-                  <Button>
-                    <PlusIcon className="w-4 h-4 mr-2" />
-                    Создать курс
-                  </Button>
-                </Link>
-              </div>
-            )}
+          </div>
+          
+          <Link href="/courses/new">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+              Создать курс
+            </Button>
+          </Link>
+        </div>
+
+        {/* Courses Grid */}
+        {courses.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-24 h-24 bg-gray-200 rounded-lg mx-auto mb-6 flex items-center justify-center">
+              <div className="w-12 h-12 bg-gray-400 rounded"></div>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              У вас пока нет курсов
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Создайте свой первый курс, чтобы начать обучение
+            </p>
+            <Link href="/courses/new">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                Создать первый курс
+              </Button>
+            </Link>
           </div>
         ) : (
-          <>
-            {/* Сетка курсов */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {courses.map((course) => (
-                <Link key={course.id} href={`/courses/${course.id}`}>
-                  <Card className="h-full cursor-pointer hover:shadow-lg transition-shadow">
-                    {/* Превью изображение */}
-                    <div className="aspect-video bg-gradient-to-br from-blue-500 to-purple-600 rounded-t-lg relative overflow-hidden">
-                      {course.thumbnail ? (
-                        <img
-                          src={course.thumbnail}
-                          alt={course.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <BookOpenIcon className="w-8 h-8 text-white/80" />
-                        </div>
-                      )}
-                      
-                      {/* Бейджи */}
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        {course.isPublic ? (
-                          <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                            <GlobeIcon className="w-3 h-3 mr-1" />
-                            Публичный
-                          </span>
-                        ) : (
-                          <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                            <LockIcon className="w-3 h-3 mr-1" />
-                            Приватный
-                          </span>
-                        )}
-                        {course.isTemplate && (
-                          <span className="bg-purple-500 text-white text-xs px-2 py-1 rounded-full">
-                            Шаблон
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Контент */}
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">
-                        {course.title}
-                      </h3>
-                      
-                      {course.description && (
-                        <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                          {course.description}
-                        </p>
-                      )}
-
-                      {/* Метрики */}
-                      <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-                        <div className="flex items-center">
-                          <BookOpenIcon className="w-3 h-3 mr-1" />
-                          {course._count.nodes} блоков
-                        </div>
-                        <div className="flex items-center">
-                          <UsersIcon className="w-3 h-3 mr-1" />
-                          {course._count.collaborators} участников
-                        </div>
-                      </div>
-
-                      {/* Автор и дата */}
-                      <div className="text-xs text-gray-500">
-                        <div className="mb-1">{getAuthorName(course.author)}</div>
-                        <div>Обновлен {formatDate(course.updatedAt)}</div>
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-
-            {/* Пагинация */}
-            {pagination.totalPages > 1 && (
-              <div className="flex justify-center items-center mt-8 gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={!pagination.hasPrevPage || loading}
-                  onClick={() => loadCourses(pagination.page - 1)}
-                >
-                  Назад
-                </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {courses.map((course) => (
+              <div
+                key={course.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <div className="w-6 h-6 bg-blue-600 rounded"></div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm">
+                      ⋯
+                    </Button>
+                  </div>
+                </div>
                 
-                <span className="text-sm text-gray-600 px-4">
-                  Страница {pagination.page} из {pagination.totalPages}
-                </span>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {course.title}
+                </h3>
                 
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={!pagination.hasNextPage || loading}
-                  onClick={() => loadCourses(pagination.page + 1)}
-                >
-                  Вперёд
-                </Button>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  {course.description}
+                </p>
+                
+                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                  <span>
+                    {course.nodeCount} элементов
+                    {course.connectionsCount !== undefined && ` • ${course.connectionsCount} связей`}
+                  </span>
+                  <span>{new Date(course.createdAt).toLocaleDateString('ru-RU')}</span>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Link href={`/courses/${course.id}/edit`} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full">
+                      Редактировать
+                    </Button>
+                  </Link>
+                  <Link href={`/courses/${course.id}`} className="flex-1">
+                    <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                      Открыть
+                    </Button>
+                  </Link>
+                </div>
               </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -2,29 +2,43 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'gradient';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   loading?: boolean;
+  fullWidth?: boolean;
   children: React.ReactNode;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', loading = false, disabled, children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
+  ({ 
+    className, 
+    variant = 'primary', 
+    size = 'md', 
+    loading = false, 
+    fullWidth = false,
+    disabled, 
+    children, 
+    ...props 
+  }, ref) => {
+    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-95';
     
     const variants = {
-      primary: 'bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary',
-      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 focus-visible:ring-secondary',
-      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground focus-visible:ring-accent',
-      ghost: 'hover:bg-accent hover:text-accent-foreground focus-visible:ring-accent',
-      destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive'
+      primary: 'bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-500 shadow-sm hover:shadow-md',
+      secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:ring-gray-500 shadow-sm hover:shadow-md',
+      outline: 'border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus-visible:ring-gray-500',
+      ghost: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus-visible:ring-gray-500',
+      destructive: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 shadow-sm hover:shadow-md',
+      gradient: 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 focus-visible:ring-blue-500 shadow-lg hover:shadow-xl'
     };
 
     const sizes = {
-      sm: 'h-9 px-3 text-sm',
-      md: 'h-10 px-4 py-2',
-      lg: 'h-11 px-8 text-lg'
+      sm: 'h-8 px-3 py-1 text-sm',
+      md: 'h-10 px-4 py-2 text-sm',
+      lg: 'h-12 px-6 py-3 text-base',
+      xl: 'h-14 px-8 py-4 text-lg'
     };
+
+    const widthStyles = fullWidth ? 'w-full' : '';
 
     return (
       <button
@@ -32,6 +46,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           baseStyles,
           variants[variant],
           sizes[size],
+          widthStyles,
           className
         )}
         ref={ref}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '../../components/ui';
 
@@ -10,34 +10,133 @@ interface Course {
   description: string;
   createdAt: string;
   nodeCount: number;
+  connectionsCount?: number;
 }
 
-const mockCourses: Course[] = [
-  {
-    id: '1',
-    title: 'Введение в программирование',
-    description: 'Основы программирования для начинающих',
-    createdAt: '2024-01-15',
-    nodeCount: 12
-  },
-  {
-    id: '2',
-    title: 'Основы дизайна',
-    description: 'Принципы графического дизайна и композиции',
-    createdAt: '2024-01-10',
-    nodeCount: 8
-  },
-  {
-    id: '3',
-    title: 'Управление проектами',
-    description: 'Методология Agile и Scrum',
-    createdAt: '2024-01-05',
-    nodeCount: 15
+interface CourseData {
+  id: string;
+  title: string;
+  description: string;
+  nodes: any[];
+  connections: any[];
+}
+
+// Функция для получения всех курсов (дефолтные + созданные пользователем)
+const getAllCourses = (): Course[] => {
+  const courses: Course[] = [];
+  
+  // Дефолтные курсы
+  const defaultCourses = [
+    {
+      id: '1',
+      title: 'Введение в программирование',
+      description: 'Основы программирования для начинающих',
+      createdAt: '2024-01-15',
+      nodeCount: 3
+    },
+    {
+      id: '2',
+      title: 'Основы дизайна',
+      description: 'Принципы графического дизайна и композиции',
+      createdAt: '2024-01-10',
+      nodeCount: 3
+    },
+    {
+      id: '3',
+      title: 'Управление проектами',
+      description: 'Методология Agile и Scrum',
+      createdAt: '2024-01-05',
+      nodeCount: 5
+    }
+  ];
+
+  // Проверяем localStorage для каждого дефолтного курса
+  defaultCourses.forEach(defaultCourse => {
+    try {
+      const savedCourse = localStorage.getItem(`course_${defaultCourse.id}`);
+      if (savedCourse) {
+        const courseData: CourseData = JSON.parse(savedCourse);
+        courses.push({
+          id: courseData.id,
+          title: courseData.title,
+          description: courseData.description,
+          createdAt: defaultCourse.createdAt,
+          nodeCount: courseData.nodes.length,
+          connectionsCount: courseData.connections.length
+        });
+      } else {
+        courses.push(defaultCourse);
+      }
+    } catch (error) {
+      console.error(`Ошибка загрузки курса ${defaultCourse.id}:`, error);
+      courses.push(defaultCourse);
+    }
+  });
+
+  // Добавляем созданные пользователем курсы
+  try {
+    const coursesList = localStorage.getItem('courses_list');
+    if (coursesList) {
+      const userCourses = JSON.parse(coursesList);
+      userCourses.forEach((userCourse: any) => {
+        // Проверяем, что это не дефолтный курс
+        if (!['1', '2', '3'].includes(userCourse.id)) {
+          courses.push({
+            id: userCourse.id,
+            title: userCourse.title,
+            description: userCourse.description,
+            createdAt: userCourse.createdAt,
+            nodeCount: userCourse.elementsCount || 0,
+            connectionsCount: userCourse.connectionsCount || 0
+          });
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки списка курсов:', error);
   }
-];
+
+  return courses.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
 
 export default function CoursesPage() {
-  const [courses] = useState<Course[]>(mockCourses);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Загружаем курсы при монтировании компонента
+    const loadCourses = () => {
+      try {
+        const allCourses = getAllCourses();
+        setCourses(allCourses);
+        console.log('Загружено курсов:', allCourses.length);
+      } catch (error) {
+        console.error('Ошибка загрузки курсов:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCourses();
+
+    // Обновляем список при изменении localStorage
+    const handleStorageChange = () => {
+      loadCourses();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-400 text-lg mb-2">Загрузка курсов...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -47,7 +146,7 @@ export default function CoursesPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Мои курсы</h1>
             <p className="text-gray-600 mt-2">
-              Управляйте своими образовательными курсами
+              Управляйте своими образовательными курсами ({courses.length} курсов)
             </p>
           </div>
           
@@ -103,7 +202,10 @@ export default function CoursesPage() {
                 </p>
                 
                 <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                  <span>{course.nodeCount} элементов</span>
+                  <span>
+                    {course.nodeCount} элементов
+                    {course.connectionsCount !== undefined && ` • ${course.connectionsCount} связей`}
+                  </span>
                   <span>{new Date(course.createdAt).toLocaleDateString('ru-RU')}</span>
                 </div>
                 

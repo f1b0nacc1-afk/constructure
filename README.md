@@ -312,14 +312,6 @@ curl -X GET http://localhost:3001/api/courses \
 
 ---
 
-## 📞 Поддержка
-
-- 📧 **Email**: support@constructure.dev
-- 🐛 **Issues**: [GitHub Issues](https://github.com/f1b0nacc1-afk/constructure/issues)
-- 📖 **Документация**: [ЗАПУСК.md](ЗАПУСК.md)
-
----
-
 <div align="center">
 
 **🏗️ Создано с ❤️ для образования**

@@ -39,7 +39,7 @@
     "@types/node": "^22.15.30",
     "concurrently": "^8.2.2",
     "eslint": "^8.51.0",
-    "prettier": "^3.0.0",
+    "prettier": "^3.6.0",
     "typescript": "^5.2.2"
   },
   "engines": {

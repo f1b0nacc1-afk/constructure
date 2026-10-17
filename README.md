@@ -1,321 +1,162 @@
-# 🏗️ Constructure - Визуальный конструктор образовательных курсов
+# Constructure
 
-<div align="center">
+Visual drag-and-drop **course constructor** for educators: build a course graph (lessons, quizzes, assignments), connect nodes, and manage courses in a browser UI.
 
-![Constructure Logo](https://img.shields.io/badge/Constructure-Visual%20Course%20Builder-blue?style=for-the-badge&logo=education)
+**Module of a larger LMS; other services are not in this repository.** Related university LMS work (other frontends, microservices, LLM features) lived outside this public surface and is not published here.
 
-**Интуитивная платформа для создания образовательных курсов с профессиональным drag & drop редактором**
+| | |
+|---|---|
+| **Owner** | Ivan Iliukhin |
+| **Role in portfolio** | Supporting edtech / LMS module (not an AI flagship) |
+| **Status** | Academic / team project — local demo and Docker stack; **not shipped** to university production |
 
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis)](https://redis.io/)
-
-[🚀 Быстрый старт](#-быстрый-старт) • [📖 Документация](ЗАПУСК.md) • [🎮 Демо](#-демо) • [🛠️ API](#-api-endpoints)
-
-</div>
+Interview talking points: [`docs/INTERVIEW.md`](docs/INTERVIEW.md). Detailed Russian runbook (if needed): [`ЗАПУСК.md`](ЗАПУСК.md).
 
 ---
 
-## ✨ Основные возможности
+## What this repository contains
 
-### 🎨 **Профессиональный визуальный редактор**
-- **Увеличенное поле редактирования** (1200x800px) с координатной сеткой
-- **Зум колесиком мыши** от 30% до 200% с автоматическим расширением канваса
-- **Drag & Drop** перетаскивание блоков с умными границами
-- **Система визуальных соединений** между элементами со стрелками
-- **Режим соединения** для создания логических связей между блоками
+A TypeScript monorepo with:
 
-### 🔗 **Интерактивные элементы курса**
-- **📚 Уроки** - основной учебный материал
-- **❓ Тесты** - проверка знаний с вопросами
-- **📝 Задания** - практические упражнения
-- **Визуальные связи** для определения последовательности изучения
+- **`apps/web`** — Next.js App Router UI: auth pages, course list/create/view/edit, React Flow–based editor components, and a custom canvas editor that persists course graphs primarily via **browser `localStorage`**
+- **`apps/api`** — Fastify REST API: JWT auth (register/login/refresh), course/node/edge CRUD against **PostgreSQL** via Prisma
+- **`packages/types`** — shared TypeScript types
+- **Docker Compose** — PostgreSQL, Redis, API, web, Nginx reverse proxy, Adminer
+- **GitHub Actions** — type-check / lint / build CI
 
-### 💾 **Реальное сохранение данных**
-- **localStorage** интеграция для сохранения курсов
-- **Автоматическая загрузка** данных при повторном открытии
-- **Синхронизация** между редактором, просмотром и списком курсов
-- **Сохранение позиций** блоков и всех структурных изменений
-
-### 🎯 **Полноценное управление курсами**
-- **Создание курсов** с полноценным визуальным редактором
-- **Редактирование** существующих курсов с сохранением изменений
-- **Просмотр курсов** с топологической сортировкой элементов
-- **Статистика** по количеству уроков, тестов и заданий
-
-### 🔐 **Система аутентификации**
-- **JWT токены** с access/refresh механизмом
-- **Защищённые маршруты** и middleware
-- **4 готовых тестовых аккаунта** для быстрого тестирования
-- **Интеграция с localStorage** для состояния пользователя
+There are **no screenshots** in this repository. UI flows below match the routes under `apps/web/src/app`.
 
 ---
 
-## 🚀 Быстрый старт
+## UI flows
 
-### 📋 Предварительные требования
+1. **Home** (`/`) — landing with links to create a course or open the course list.
+2. **Auth** (`/auth/login`, `/auth/register`) — email/password against the API; tokens stored in `localStorage`.
+3. **Test accounts** (`/test-accounts`) — helper page with seeded demo accounts for local testing.
+4. **Courses** (`/courses`) — list default sample courses and any user-created ones; list state is driven by `localStorage`.
+5. **New course** (`/courses/new`) — create a course and open the editor.
+6. **Edit** (`/courses/[id]/edit`) — canvas with drag-and-drop blocks (lesson / quiz / assignment), connect mode, zoom, save to `localStorage`.
+7. **View** (`/courses/[id]`) — read-only view of the course graph.
+8. **React Flow editor** (`apps/web/src/components/editor/`) — alternate editor shell (toolbar, node panel, properties panel, custom node types) built on React Flow.
 
-- **Docker** >= 20.10.0
-- **Docker Compose** >= 2.0.0
-- **curl** (для проверки готовности сервисов)
+---
 
-### ⚡ Супер-быстрый запуск (рекомендуется!)
+## Tech stack (this repo only)
+
+Documented from `package.json` files and Compose — not the wider LMS.
+
+| Layer | Present here |
+|-------|----------------|
+| Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS, React Flow, Zustand, Axios, Zod, Lucide |
+| Backend | Fastify, Prisma, JWT (`@fastify/jwt` / `jsonwebtoken`), bcryptjs, Zod, Winston |
+| Data | PostgreSQL 15 (Prisma schema: users, courses, nodes, edges, collaborators, comments, versions) |
+| Infra | Docker Compose, Nginx, Adminer; Redis image/dependency present (Compose + `redis` package) — **not wired into application routes yet** |
+| Tooling | npm workspaces-style scripts, ESLint, Prettier, GitHub Actions |
+
+Dependencies such as Cloudinary / Socket.IO appear in package manifests or config placeholders; there is **no** DeepSeek (or other LLM) integration in this repository.
+
+---
+
+## Install and run
+
+### Prerequisites
+
+- Node.js ≥ 18 and npm ≥ 9 (for local `npm run dev`)
+- Docker + Docker Compose (recommended full stack)
+
+### Docker (recommended)
 
 ```bash
-# Клонируйте репозиторий
 git clone https://github.com/f1b0nacc1-afk/constructure.git
 cd constructure
-
-# Запустите автоматический скрипт
 ./quick-start.sh
+# or: docker compose up -d
 ```
 
-**🎯 Скрипт автоматически:**
-- ✅ Проверит все зависимости (Docker, Docker Compose)
-- 🔧 Остановит старые контейнеры
-- 🚀 Запустит все сервисы
-- ⏳ Дождется готовности всех компонентов
-- 📊 Применит миграции базы данных
-- 📋 Покажет информацию о доступных сервисах
+Typical local URLs after Compose is up:
 
-### 🌐 Доступные сервисы
+| Service | URL |
+|---------|-----|
+| Web | http://localhost:3000 |
+| API | http://localhost:3001 |
+| Nginx proxy | http://localhost:8000 |
+| Adminer | http://localhost:8080 |
+| PostgreSQL | `localhost:5433` |
 
-| Сервис | URL | Описание |
-|--------|-----|----------|
-| **🎨 Frontend** | http://localhost:3000 | Основное веб-приложение |
-| **⚙️ Backend API** | http://localhost:3001 | REST API сервер |
-| **🌐 Nginx** | http://localhost:8000 | Главный прокси-сервер |
-| **🗄️ Adminer** | http://localhost:8080 | Веб-интерфейс для БД |
-| **🐘 PostgreSQL** | localhost:5433 | База данных |
-| **🔴 Redis** | localhost:6379 | Кэш и сессии |
+Stop: `./quick-stop.sh` or `docker compose down`.
 
----
+### Local npm (API + web)
 
-## 🎮 Демо
+```bash
+npm run install:all
+npm run build:types
+# ensure PostgreSQL is reachable (Compose postgres service, or your own instance)
+# set DATABASE_URL / JWT secrets via environment (see apps/api/src/config)
+cd apps/api && npx prisma generate && npx prisma db push
+cd ../..
+npm run dev
+```
 
-### 🔑 Тестовые аккаунты
-
-Для удобства тестирования созданы готовые аккаунты:
-
-| Роль | Email | Пароль | Описание |
-|------|-------|--------|----------|
-| **👑 Администратор** | admin@constructure.com | admin123456 | Полный доступ ко всем функциям |
-| **👨‍🏫 Преподаватель** | teacher@example.com | teacher123 | Создание и управление курсами |
-| **👨‍🎓 Студент** | student@example.com | student123 | Прохождение курсов и тестов |
-| **🧪 Тестовый** | test@example.com | password123 | Общий тестовый аккаунт |
-
-**🎯 Быстрый доступ**: http://localhost:3000/test-accounts
-
-### 📚 Примеры курсов
-
-Приложение включает 3 готовых курса для демонстрации:
-
-1. **💻 Введение в программирование** - 3 элемента, 2 связи
-2. **🎨 Основы дизайна** - 3 элемента, 2 связи  
-3. **📊 Управление проектами** - 5 элементов, 4 связи
+Compose and seed scripts use **local demo** credentials only (not production or university secrets). Change JWT secrets and DB passwords before any shared deployment.
 
 ---
 
-## 🎨 Как использовать визуальный редактор
+## Status
 
-### 🆕 Создание нового курса
-1. Перейдите на http://localhost:3000/courses
-2. Нажмите **"Создать курс"**
-3. Заполните название и описание
-4. Используйте полноценный визуальный редактор:
-   - **Добавляйте элементы** кнопками "📚 Урок", "❓ Тест", "📝 Задание"
-   - **Перетаскивайте блоки** мышью
-   - **Создавайте связи** в режиме соединения
-   - **Используйте зум** колесиком мыши
-5. Нажмите **"💾 Создать курс"**
-
-### ✏️ Редактирование курса
-1. Откройте любой курс для редактирования
-2. **Навигация и зум:**
-   - **Колесико мыши** - приближение/отдаление (30%-200%)
-   - **Автоматическое расширение** канваса при отдалении
-   - **Кнопки зума** для точного управления
-3. **Работа с элементами:**
-   - **Перетаскивание** - просто тащите блоки мышью
-   - **Редактирование текста** - кликайте на название или описание
-   - **Удаление блока** - нажмите "×" на блоке
-4. **Создание связей:**
-   - Нажмите **"🔗 Соединить блоки"**
-   - Кликните на первый блок, затем на второй
-   - **Удаление связи** - кликните красный кружок на линии
-5. **Сохранение** - нажмите **"💾 Сохранить"**
+- Built as an **academic / team** LMS module for university coursework.
+- Useful as a **local demo** of a visual course builder + JWT API + Docker packaging.
+- **Not shipped** to university production (deployment cancelled / not released).
+- Broader LMS services and any LLM/chat features are **out of scope for this public repo**.
 
 ---
 
-## 📂 Архитектура проекта
+## Limitations
+
+- Editor UX and course list heavily rely on **`localStorage`**; API persistence and UI are not fully unified end-to-end.
+- Two editor approaches coexist (custom canvas on edit pages + React Flow components) — not a single polished product surface.
+- Redis / Cloudinary / WebSocket packages are present or stubbed but not implemented as product features.
+- Prisma schema models collaborators, comments, and versions; corresponding product UI/flows are incomplete or unused.
+- Default JWT secrets and Compose passwords are for **local development only**.
+- No production metrics, user counts, or university deployment claims — none exist in this repository.
+
+---
+
+## What I would do next
+
+1. **Single source of truth** — wire the course editor and list fully to the Fastify/Prisma API; keep `localStorage` only as offline cache or remove it.
+2. **Consolidate editors** — pick React Flow or the custom canvas, delete the duplicate path, add tests for graph save/load.
+3. **Honesty in infra** — either implement Redis/session caching and real-time collaboration, or remove unused dependencies and Compose services to shrink the demo surface.
+
+---
+
+## Project layout
 
 ```
 constructure/
-├── 🎨 apps/web/                    # Next.js Frontend
-│   ├── src/app/
-│   │   ├── auth/                   # Аутентификация
-│   │   ├── courses/                # Управление курсами
-│   │   │   ├── page.tsx           # Список курсов
-│   │   │   ├── new/               # Создание курса
-│   │   │   └── [id]/              # Просмотр/редактирование
-│   │   └── test-accounts/         # Тестовые аккаунты
-│   ├── src/components/
-│   │   ├── auth/                  # Компоненты аутентификации
-│   │   ├── layout/                # Навигация и макеты
-│   │   └── ui/                    # UI компоненты
-│   └── src/hooks/                 # React хуки
-├── ⚙️ apps/api/                    # Fastify Backend
-│   ├── src/routes/                # API маршруты
-│   └── prisma/                    # База данных
-├── 📦 packages/types/              # TypeScript типы
-├── 🐳 docker-compose.yml           # Docker конфигурация
-├── 🚀 quick-start.sh              # Скрипт быстрого запуска
-├── 🛑 quick-stop.sh               # Скрипт остановки
-└── 📖 ЗАПУСК.md                   # Подробная документация
+├── apps/web/           # Next.js frontend
+├── apps/api/           # Fastify + Prisma API
+├── packages/types/     # Shared TypeScript types
+├── nginx/              # Reverse proxy config
+├── scripts/            # Docker / DB helpers
+├── documentation/      # Older design/plan notes (mixed RU)
+├── docs/INTERVIEW.md   # Interview talk track (EN)
+├── docker-compose.yml
+└── quick-start.sh
 ```
 
 ---
 
-## 🛠️ Полезные команды
+## License
 
-### 🐳 Docker управление
-```bash
-# Запуск всех сервисов
-docker-compose up -d
-
-# Остановка всех сервисов  
-docker-compose down
-# или
-./quick-stop.sh
-
-# Просмотр логов
-docker-compose logs -f web    # Фронтенд
-docker-compose logs -f api    # Backend
-
-# Перезапуск сервисов
-docker-compose restart web
-docker-compose restart api
-
-# Пересборка контейнеров
-docker-compose build --no-cache
-```
-
-### 🗄️ База данных
-```bash
-# Prisma Studio UI
-docker-compose exec api npx prisma studio
-
-# Применить миграции
-docker-compose exec api npx prisma migrate deploy
-
-# Генерация Prisma Client
-docker-compose exec api npx prisma generate
-```
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-## 🔒 API Endpoints
+<details>
+<summary>Русская справка (кратко)</summary>
 
-### 🔐 Аутентификация
-```bash
-POST /api/auth/register    # Регистрация пользователя
-POST /api/auth/login       # Авторизация
-GET  /api/auth/me          # Получение профиля (защищённый)
-POST /api/auth/refresh     # Обновление токена
-```
+**Constructure** — визуальный конструктор курсов (модуль более крупной LMS; остальные сервисы в этот репозиторий не входят). Статус: учебный/командный проект, в прод вуза не выкатывался.
 
-### 📚 Курсы
-```bash
-GET    /api/courses        # Список курсов
-POST   /api/courses        # Создание курса
-GET    /api/courses/:id    # Получение курса
-PUT    /api/courses/:id    # Обновление курса
-DELETE /api/courses/:id    # Удаление курса
-```
+Быстрый запуск: `./quick-start.sh`. Подробности по окружению: [ЗАПУСК.md](ЗАПУСК.md). Собеседования (EN): [docs/INTERVIEW.md](docs/INTERVIEW.md).
 
-### 💡 Пример использования
-```bash
-# Авторизация
-curl -X POST http://localhost:3001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}'
-
-# Получение курсов
-curl -X GET http://localhost:3001/api/courses \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
----
-
-## 🎯 Статус разработки
-
-### ✅ **Полностью реализовано**
-
-**🎨 Визуальный редактор курсов:**
-- Профессиональное поле редактирования с координатной сеткой
-- Зум и автоматическое расширение канваса
-- Drag & Drop с умными границами
-- Система визуальных соединений
-- Реальное сохранение в localStorage
-
-**🔐 Система аутентификации:**
-- JWT токены с refresh механизмом
-- Защищённые маршруты
-- 4 готовых тестовых аккаунта
-- Интеграция фронтенда с бэкендом
-
-**⚙️ Backend инфраструктура:**
-- RESTful API с Fastify
-- PostgreSQL + Prisma ORM
-- Redis для кэширования
-- Docker-compose setup
-
-**🎨 Frontend (Next.js 14):**
-- Современный UI с Tailwind CSS
-- Полноценное управление курсами
-- Отзывчивый дизайн
-- TypeScript интеграция
-
-### 🔄 **В активной разработке**
-
-- Расширенные возможности редактора
-- Дополнительные типы элементов курса
-- Улучшенная система уведомлений
-- Экспорт курсов в различные форматы
-
-### 📋 **Запланировано**
-
-- Совместная работа в реальном времени
-- Аналитика и отчёты по курсам
-- Интеграция с внешними LMS
-- Мобильное приложение
-
----
-
-## 🤝 Вклад в проект
-
-Мы приветствуем вклад в развитие проекта! 
-
-1. **Fork** репозитория
-2. Создайте **feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Commit** изменения (`git commit -m 'Add amazing feature'`)
-4. **Push** в branch (`git push origin feature/amazing-feature`)
-5. Откройте **Pull Request**
-
----
-
-## 📄 Лицензия
-
-Этот проект распространяется под лицензией MIT. См. файл [LICENSE](LICENSE) для подробностей.
-
----
-
-<div align="center">
-
-**🏗️ Создано с ❤️ для образования**
-
-[⭐ Поставьте звезду](https://github.com/f1b0nacc1-afk/constructure) • [🔄 Fork проекта](https://github.com/f1b0nacc1-afk/constructure/fork) • [📢 Поделиться](https://twitter.com/intent/tweet?text=Check%20out%20Constructure%20-%20Visual%20Course%20Builder!&url=https://github.com/f1b0nacc1-afk/constructure)
-
-</div> 
+</details>
